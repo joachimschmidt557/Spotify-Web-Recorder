@@ -1,4 +1,15 @@
 
-xulrunner need to be in the exe path to run
--->
-Copy xulrunner folder from lib to bin/debug and bin/release
+Source Code Notes
+-------------------------------------------------------------------------------------
+
+When in Debug mode, the application does not automatically load the Spotify web 
+page. Click the reload button in the toolbar to load the page.
+
+-------------------------------------------------------------------------------------
+
+Problem:	The first time you try to compile and run the applicaiton it crashes
+Why:		XulRunner needs to be in the exe path
+Solution:	Copy xulrunner folder from /lib to /SpotifyRecorder.Forms.UI/bin/debug
+
+-------------------------------------------------------------------------------------
+
