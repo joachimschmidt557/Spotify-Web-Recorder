@@ -1,0 +1,4 @@
+
+xulrunner need to be in the exe path to run
+-->
+Copy xulrunner folder from lib to bin/debug and bin/release
