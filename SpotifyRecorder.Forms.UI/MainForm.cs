@@ -20,13 +20,14 @@ namespace SpotifyWebRecorder.Forms.UI
     public partial class MainForm : Form
     {
 		GeckoWebBrowser browser;
+		Timer stateCheckTimer = new Timer();
 
 		private enum ApplicationState
         {
             NotRecording = 1,
             WaitingForRecording = 2,
             Recording = 3,
-            Closing = 4
+            Closing = 4,
         }
 
         private SoundCardRecorder SoundCardRecorder { get; set; }
@@ -34,7 +35,20 @@ namespace SpotifyWebRecorder.Forms.UI
         private FolderBrowserDialog folderDialog;
         private ApplicationState _currentApplicationState = ApplicationState.NotRecording;
 
-        public MainForm()
+
+		private enum SpotifyState
+		{
+			Unknown = 0,
+			Paused = 1,
+			Playing = 2,
+			Ad = 3,
+		}
+
+		private Mp3Tag currentTrack = new Mp3Tag("","","");
+		private Mp3Tag recordingTrack = new Mp3Tag("","","");
+		private SpotifyState currentSpotifyState = SpotifyState.Unknown;
+
+		public MainForm()
         {
             InitializeComponent();
 
@@ -56,7 +70,7 @@ namespace SpotifyWebRecorder.Forms.UI
 			GeckoPreferences.Default["extensions.blocklist.enabled"] = false;	// enables flash. If it does not work, also make sure that "Project -> Properties -> Debug -> Enable Visual Studio hostng process" is not enablable
 
 			this.splitContainer1.Panel2.Controls.Add( browser );
-			browser.DocumentTitleChanged += new EventHandler( browser_DocumentTitleChanged );
+			//browser.DocumentTitleChanged += new EventHandler( browser_DocumentTitleChanged );
 
 			GeckoWebBrowser browserAbout = new GeckoWebBrowser { Dock = DockStyle.Fill };
 			browserAbout.Navigate( baseDir + "\\About.html" );
@@ -68,14 +82,19 @@ namespace SpotifyWebRecorder.Forms.UI
 			tabPageHelp.Controls.Add( browserHelp );
 			browserHelp.DomClick += OpenGeckoLinksInNewWindow;
 
+			stateCheckTimer.Interval = 25;
+			stateCheckTimer.Tick += new EventHandler( stateCheckTimer_Tick );
+			stateCheckTimer.Start();
+
 			addToLog( "Application started..." );
 
 #if !DEBUG
 			tabControl1.TabPages.RemoveByKey("tabPageLog");
 			browser.Navigate( Util.GetDefaultURL() );
+#else
+			//browser.Navigate( Util.GetDefaultURL() );
 #endif
 		}
-
 
 		void OpenGeckoLinksInNewWindow( object sender, DomMouseEventArgs e )
 		{
@@ -89,76 +108,6 @@ namespace SpotifyWebRecorder.Forms.UI
 				}
 			}
 		}
-
-		void browser_DocumentTitleChanged( object sender, EventArgs e )
-		{
-			toolStripButton_Back.Enabled = browser.CanGoBack;
-
-			this.Text = browser.DocumentTitle.Replace( " - Spotify", "" );
-			if( this.Text == "" ) return;
-
-			string song = string.Empty;
-
-			// is something playing?
-			if( (int)this.Text[0] == Util.GetDefaultPlayIndicationChar() )	// play symbol
-			{
-				song = this.Text.Substring( 2 );
-			}
-
-			// skip spotify ads
-			addToLog( "Test for ads: " + this.Text );
-			if( this.Text.Contains("Spotify - Spotify") )
-			{
-				addToLog( "Ads detected - Attempting to Mute!" );
-				song = "";
-				if( MuteOnAdsCheckBox.Checked && !MutedSound )
-				{
-					addToLog( "Muting..." );
-					Util.ToggleMuteVolume( this.Handle );
-					MutedSound = true;
-				}
-			}
-			else
-			{
-				if( MutedSound )
-				{
-					addToLog( "Un-Muting" );
-					Util.ToggleMuteVolume( this.Handle );
-					MutedSound = false;
-				}
-			}
-
-			// Identify Artist and Track name
-			Match match = Regex.Match( song, @"(.*) - (.*)$", RegexOptions.IgnoreCase );
-			if( match.Success )
-			{
-				song = match.Groups[2].Value + " - " + match.Groups[1].Value;
-			}
-			
-			// Set state
-			if( !songLabel.Text.Equals( song ) )
-			{
-				songLabel.Text = song;
-				if( songLabel.Text.Trim().Length > 0 )
-				{
-					addToLog( "Now playing: " + song );
-					if( _currentApplicationState != ApplicationState.NotRecording )
-						ChangeApplicationState( ApplicationState.Recording );
-					else if( _currentApplicationState == ApplicationState.Recording )
-						ChangeApplicationState( ApplicationState.WaitingForRecording );
-				}
-				else
-				{
-					addToLog( "Music stopped");
-					if( _currentApplicationState == ApplicationState.Recording )
-						ChangeApplicationState( ApplicationState.WaitingForRecording );
-
-				}
-			}
-
-			songLabel.Visible = _currentApplicationState == ApplicationState.Recording;
-		}
-
 
         private void ChangeApplicationState(ApplicationState newState)
         {
@@ -174,7 +123,7 @@ namespace SpotifyWebRecorder.Forms.UI
                         case ApplicationState.WaitingForRecording:
                             break;
                         case ApplicationState.Recording:
-                            StartRecording((MMDevice)deviceListBox.SelectedItem, songLabel.Text);
+							StartRecording( (MMDevice)deviceListBox.SelectedItem);
                             break;
                         case ApplicationState.Closing:
                             break;
@@ -189,7 +138,7 @@ namespace SpotifyWebRecorder.Forms.UI
                         case ApplicationState.WaitingForRecording:
                             throw new Exception(string.Format("NY {0} - {1}",_currentApplicationState,newState));
                         case ApplicationState.Recording:
-                            StartRecording((MMDevice)deviceListBox.SelectedItem, songLabel.Text);
+							StartRecording( (MMDevice)deviceListBox.SelectedItem);
                             break;
                         case ApplicationState.Closing:
                             //Close();
@@ -204,7 +153,7 @@ namespace SpotifyWebRecorder.Forms.UI
                             break;
                         case ApplicationState.Recording: //file changed
                             StopRecording();
-                            StartRecording((MMDevice)deviceListBox.SelectedItem, songLabel.Text);
+							StartRecording( (MMDevice)deviceListBox.SelectedItem);
                             break;
                         case ApplicationState.WaitingForRecording: //file changed
                             StopRecording();
@@ -238,7 +187,6 @@ namespace SpotifyWebRecorder.Forms.UI
                     buttonStopRecording.Enabled = true;
                     deviceListBox.Enabled = false;
                     break;
-
             }
         }
 
@@ -346,16 +294,18 @@ namespace SpotifyWebRecorder.Forms.UI
             return Path.Combine(outputFolderTextBox.Text, string.Format("{0}.{1}", song, extension));
         }
 
-        private void StartRecording(MMDevice device, string song)
+        private void StartRecording(MMDevice device)
         {
-            if (!string.IsNullOrEmpty(song) && device != null)
+            if (device != null)
             {
                 if(SoundCardRecorder!=null)
                     StopRecording();
 
+				recordingTrack = new Mp3Tag( currentTrack.Title, currentTrack.Artist, currentTrack.TrackUri );
+
                 SoundCardRecorder = new SoundCardRecorder(
-                                device, CreateOutputFile(songLabel.Text, "wav"),
-                                songLabel.Text);
+								device, CreateOutputFile( recordingTrack.Artist + " - " + recordingTrack.Title, "wav" ),
+								recordingTrack.Artist + " - " + recordingTrack.Title );
                 SoundCardRecorder.Start();
 
 				addToLog( "Recording!" );
@@ -415,15 +365,16 @@ namespace SpotifyWebRecorder.Forms.UI
             process.StartInfo.CreateNoWindow = true;
             process.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
 
-            Mp3Tag tag = Util.ExtractMp3Tag(filePath);
+            //Mp3Tag tag = Util.ExtractMp3Tag(filePath);
 
             process.StartInfo.FileName = "lame.exe";
-			process.StartInfo.Arguments = string.Format( "{2} --tt \"{3}\" --ta \"{4}\"  \"{0}\" \"{1}\"",
+			process.StartInfo.Arguments = string.Format( "{2} --tt \"{3}\" --ta \"{4}\" --tc \"{5}\"  \"{0}\" \"{1}\"",
 				CreateOutputFile( filePath, "wav" ),
-				CreateOutputFile( tag.Artist + " - " + tag.Title, "mp3" ),
+				CreateOutputFile( recordingTrack.Artist + " - " + recordingTrack.Title, "mp3" ),
 				bitrate,
-				tag.Title,
-				tag.Artist );
+				recordingTrack.Title,
+				recordingTrack.Artist,
+				recordingTrack.TrackUri );
 
             process.StartInfo.WorkingDirectory = new FileInfo(Application.ExecutablePath).DirectoryName;
             addToLog( "Starting LAME..." );
@@ -646,6 +597,100 @@ namespace SpotifyWebRecorder.Forms.UI
 				splitContainer1.Panel1Collapsed = true;
 			}
 			toolStripButtonHideSidebar.Checked = !toolStripButtonHideSidebar.Checked;
+		}
+
+		void stateCheckTimer_Tick( object sender, EventArgs e )
+		{
+			// figure out what spotify is doing right now
+			var iframe = browser.Document.GetElementsByTagName( "iframe" ).FirstOrDefault() as Gecko.DOM.GeckoIFrameElement;
+			if( iframe != null )
+			{
+				var doc = iframe.ContentDocument.DocumentElement as GeckoHtmlElement;
+				if( doc != null )
+				{
+					SpotifyState oldState = currentSpotifyState;
+					string oldTrack = currentTrack.TrackUri;
+
+					// get current track
+					var isPlaying = doc.QuerySelector( "#play.playing" );
+					if( isPlaying != null )
+					{
+						currentSpotifyState = SpotifyState.Playing;
+						var artist = doc.QuerySelector( "p.artist a" ).TextContent;
+						var title = doc.QuerySelector( "p.track a" ).TextContent;
+						var trackUri = doc.QuerySelector( "p.track a" ).GetAttribute( "data-uri" );
+						currentTrack = new Mp3Tag( title, artist, trackUri);
+					}
+					else
+						currentSpotifyState = SpotifyState.Paused;
+
+					// ad detection
+					var addToMyMusicButton = doc.QuerySelector( ".caption button.button-add" );
+					if( addToMyMusicButton != null )
+					{
+						var style = addToMyMusicButton.Attributes["style"];
+						if( style != null )
+						{
+							if( style.NodeValue.Contains( "display: none" ) )
+							{
+								currentSpotifyState = SpotifyState.Ad;
+							}
+						}
+					}
+
+					// mute sound on ads
+					if( currentSpotifyState == SpotifyState.Ad )
+					{
+						addToLog( "Ads detected - Attempting to Mute!" );
+						if( MuteOnAdsCheckBox.Checked && !MutedSound )
+						{
+							addToLog( "Muting..." );
+							Util.ToggleMuteVolume( this.Handle );
+							MutedSound = true;
+						}
+					}
+					else
+					{
+						if( MutedSound )
+						{
+							addToLog( "Un-Muting" );
+							Util.ToggleMuteVolume( this.Handle );
+							MutedSound = false;
+						}
+					}
+
+					// set state if changed
+					if( oldState != currentSpotifyState || oldTrack != currentTrack.TrackUri ) 
+					{
+						if( currentSpotifyState == SpotifyState.Playing )
+						{
+							var song = currentTrack.Artist + " - " + currentTrack.Title;
+							songLabel.Text = song;
+							addToLog( "Now playing: " + song );
+							if( _currentApplicationState != ApplicationState.NotRecording )
+							{
+								ChangeApplicationState( ApplicationState.Recording );
+							}
+							else if( _currentApplicationState == ApplicationState.Recording )
+							{
+								ChangeApplicationState( ApplicationState.WaitingForRecording );
+							}
+						}
+						else if( currentSpotifyState == SpotifyState.Paused )
+						{
+							addToLog( "Music stopped" );
+							if( _currentApplicationState == ApplicationState.Recording )
+							{
+								ChangeApplicationState( ApplicationState.WaitingForRecording );
+							}
+						}
+
+					}
+
+				}
+			}
+
+			songLabel.Visible = _currentApplicationState == ApplicationState.Recording;
 		}
 
 	}

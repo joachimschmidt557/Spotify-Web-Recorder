@@ -83,31 +83,6 @@ namespace SpotifyWebRecorder.Forms.UI
             Settings.Default.Bitrate = bitrate;
             Settings.Default.Save();
         }
-        public static Mp3Tag ExtractMp3Tag(string song)
-        {
-			/*
-            string[] split = song.Split(new[] { "–" }, 2, StringSplitOptions.RemoveEmptyEntries);
-				Mp3Tag tag = new Mp3Tag(
-                split.Length > 1 ? split[1] : string.Empty,
-                split[0]
-                );
-            return tag;
-			 * */
-
-			Match match = Regex.Match( song, @"(.*?) - (.*)$", RegexOptions.IgnoreCase );
-			if( match.Success )
-			{
-				Console.WriteLine( "Title: " + match.Groups[2].Value );
-				Console.WriteLine( "Artist: " + match.Groups[1].Value );
-			}
-
-			Mp3Tag tag = new Mp3Tag(
-				match.Groups[2].Value,
-				match.Groups[1].Value
-				);
-			return tag;
-
-        }
 
 		public static string GetDefaultUserAgent()
 		{
@@ -128,16 +103,5 @@ namespace SpotifyWebRecorder.Forms.UI
 			Settings.Default.URL = url;
 			Settings.Default.Save();
 		}
-
-		public static int GetDefaultPlayIndicationChar()
-		{
-			return Settings.Default.PlayIndicationChar;
-		}
-		public static void SetDefaultURL( int ch )
-		{
-			Settings.Default.PlayIndicationChar = ch;
-			Settings.Default.Save();
-		}
-
 	}
 }

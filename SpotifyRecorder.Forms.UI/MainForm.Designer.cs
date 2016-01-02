@@ -358,9 +358,9 @@
 			this.MuteOnAdsCheckBox.AutoSize = true;
 			this.MuteOnAdsCheckBox.Location = new System.Drawing.Point(12, 219);
 			this.MuteOnAdsCheckBox.Name = "MuteOnAdsCheckBox";
-			this.MuteOnAdsCheckBox.Size = new System.Drawing.Size(198, 17);
+			this.MuteOnAdsCheckBox.Size = new System.Drawing.Size(163, 17);
 			this.MuteOnAdsCheckBox.TabIndex = 85;
-			this.MuteOnAdsCheckBox.Text = "Mute sound if Spotify ad is detected ";
+			this.MuteOnAdsCheckBox.Text = "Mute sound if ad is detected ";
 			this.MuteOnAdsCheckBox.UseVisualStyleBackColor = true;
 			// 
 			// openRecordingDevicesButton

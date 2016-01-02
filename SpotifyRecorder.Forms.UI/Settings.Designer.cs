@@ -59,15 +59,6 @@ namespace SpotifyWebRecorder.Forms.UI {
             }
         }
         
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("100")]
-        public int SongscanInterval {
-            get {
-                return ((int)(this["SongscanInterval"]));
-            }
-        }
-        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("30")]
@@ -118,25 +109,13 @@ namespace SpotifyWebRecorder.Forms.UI {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("http://play.spotify.com/")]
+        [global::System.Configuration.DefaultSettingValueAttribute("https://player.spotify.com")]
         public string URL {
             get {
                 return ((string)(this["URL"]));
             }
             set {
                 this["URL"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("9654")]
-        public int PlayIndicationChar {
-            get {
-                return ((int)(this["PlayIndicationChar"]));
-            }
-            set {
-                this["PlayIndicationChar"] = value;
             }
         }
     }

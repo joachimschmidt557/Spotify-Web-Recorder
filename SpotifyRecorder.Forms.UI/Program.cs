@@ -14,17 +14,9 @@ namespace SpotifyWebRecorder.Forms.UI
         [STAThread]
         static void Main()
         {
-            try
-            {
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new MainForm());
-            }
-            catch (Exception e)
-            {
-                MessageBox.Show(e.Message + e.InnerException.Message);
-            }
-            
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new MainForm());
         }
     }
 }
