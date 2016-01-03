@@ -24,7 +24,7 @@
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="URL" Type="System.String" Scope="User">
-      <Value Profile="(Default)">https://player.spotify.com</Value>
+      <Value Profile="(Default)">https://play.spotify.com/</Value>
     </Setting>
   </Settings>
 </SettingsFile>

@@ -109,7 +109,7 @@ namespace SpotifyWebRecorder.Forms.UI {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("https://player.spotify.com")]
+        [global::System.Configuration.DefaultSettingValueAttribute("https://play.spotify.com/")]
         public string URL {
             get {
                 return ((string)(this["URL"]));

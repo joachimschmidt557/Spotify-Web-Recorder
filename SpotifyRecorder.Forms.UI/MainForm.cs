@@ -22,7 +22,7 @@ namespace SpotifyWebRecorder.Forms.UI
 		GeckoWebBrowser browser;
 		Timer stateCheckTimer = new Timer();
 
-		private enum ApplicationState
+		private enum RecorderState
         {
             NotRecording = 1,
             WaitingForRecording = 2,
@@ -33,7 +33,7 @@ namespace SpotifyWebRecorder.Forms.UI
         private SoundCardRecorder SoundCardRecorder { get; set; }
 		private bool MutedSound = false;
         private FolderBrowserDialog folderDialog;
-        private ApplicationState _currentApplicationState = ApplicationState.NotRecording;
+        private RecorderState _currentApplicationState = RecorderState.NotRecording;
 
 
 		private enum SpotifyState
@@ -109,53 +109,53 @@ namespace SpotifyWebRecorder.Forms.UI
 			}
 		}
 
-        private void ChangeApplicationState(ApplicationState newState)
+        private void ChangeApplicationState(RecorderState newState)
         {
             ChangeGui(newState);
 
             switch (_currentApplicationState)
             {
-                case ApplicationState.NotRecording:
+                case RecorderState.NotRecording:
                     switch (newState)
                     {
-                        case ApplicationState.NotRecording:
+                        case RecorderState.NotRecording:
                             break;
-                        case ApplicationState.WaitingForRecording:
+                        case RecorderState.WaitingForRecording:
                             break;
-                        case ApplicationState.Recording:
+                        case RecorderState.Recording:
 							StartRecording( (MMDevice)deviceListBox.SelectedItem);
                             break;
-                        case ApplicationState.Closing:
+                        case RecorderState.Closing:
                             break;
                     }
 
                     break;
-                case ApplicationState.WaitingForRecording:
+                case RecorderState.WaitingForRecording:
                     switch (newState)
                     {
-                        case ApplicationState.NotRecording:
+                        case RecorderState.NotRecording:
                             break;
-                        case ApplicationState.WaitingForRecording:
+                        case RecorderState.WaitingForRecording:
                             throw new Exception(string.Format("NY {0} - {1}",_currentApplicationState,newState));
-                        case ApplicationState.Recording:
+                        case RecorderState.Recording:
 							StartRecording( (MMDevice)deviceListBox.SelectedItem);
                             break;
-                        case ApplicationState.Closing:
+                        case RecorderState.Closing:
                             //Close();
                             break;
                     }
                     break;
-                case ApplicationState.Recording:
+                case RecorderState.Recording:
                     switch (newState)
                     {
-                        case ApplicationState.NotRecording:
+                        case RecorderState.NotRecording:
                             StopRecording();
                             break;
-                        case ApplicationState.Recording: //file changed
+                        case RecorderState.Recording: //file changed
                             StopRecording();
 							StartRecording( (MMDevice)deviceListBox.SelectedItem);
                             break;
-                        case ApplicationState.WaitingForRecording: //file changed
+                        case RecorderState.WaitingForRecording: //file changed
                             StopRecording();
                             break;
                     }
@@ -165,23 +165,23 @@ namespace SpotifyWebRecorder.Forms.UI
             _currentApplicationState = newState;
         }
 
-        private void ChangeGui(ApplicationState state)
+        private void ChangeGui(RecorderState state)
         {
             switch (state)
             {
-                case ApplicationState.NotRecording:
+                case RecorderState.NotRecording:
                     browseButton.Enabled = true;
                     buttonStartRecording.Enabled = true;
                     buttonStopRecording.Enabled = false;
                     deviceListBox.Enabled = true;
                     break;
-                case ApplicationState.WaitingForRecording:
+                case RecorderState.WaitingForRecording:
                     browseButton.Enabled = false;
                     buttonStartRecording.Enabled = false;
                     buttonStopRecording.Enabled = true;
                     deviceListBox.Enabled = false;
                     break;
-                case ApplicationState.Recording:
+                case RecorderState.Recording:
                     browseButton.Enabled = false;
                     buttonStartRecording.Enabled = false;
                     buttonStopRecording.Enabled = true;
@@ -228,7 +228,7 @@ namespace SpotifyWebRecorder.Forms.UI
         private void OnClosing(object sender, CancelEventArgs cancelEventArgs)
         {
 			StopRecording();
-            ChangeApplicationState(ApplicationState.Closing);
+            ChangeApplicationState(RecorderState.Closing);
 			Util.SetDefaultBitrate( bitrateComboBox.SelectedIndex );
             Util.SetDefaultDevice(deviceListBox.SelectedItem.ToString());
             Util.SetDefaultOutputPath(outputFolderTextBox.Text);
@@ -274,13 +274,13 @@ namespace SpotifyWebRecorder.Forms.UI
         private void ButtonStartRecordingClick(object sender, EventArgs e)
         {
             ChangeApplicationState(songLabel.Text.Trim().Length > 0
-                                       ? ApplicationState.Recording
-                                       : ApplicationState.WaitingForRecording);
+                                       ? RecorderState.Recording
+                                       : RecorderState.WaitingForRecording);
         }
 
         private void ButtonStopRecordingClick(object sender, EventArgs e)
         {
-            ChangeApplicationState(ApplicationState.NotRecording);
+            ChangeApplicationState(RecorderState.NotRecording);
         }
 
         private void ClearButtonClick(object sender, EventArgs e)
@@ -602,30 +602,61 @@ namespace SpotifyWebRecorder.Forms.UI
 		void stateCheckTimer_Tick( object sender, EventArgs e )
 		{
 			// figure out what spotify is doing right now
-			var iframe = browser.Document.GetElementsByTagName( "iframe" ).FirstOrDefault() as Gecko.DOM.GeckoIFrameElement;
-			if( iframe != null )
+
+			var iframes = browser.Document.GetElementsByTagName( "iframe" );
+			foreach( Gecko.DOM.GeckoIFrameElement frame in iframes )
 			{
-				var doc = iframe.ContentDocument.DocumentElement as GeckoHtmlElement;
+				GeckoHtmlElement doc = null;
+
+				string queryArtist = "", queryTrack = "", queryTrackUri = "", queryIsPlaying = "", queryAddButton = "", attrTrackUri = "";
+
+				// Old Player
+				if( frame.Id == "app-player" )
+				{
+					doc = frame.ContentDocument.DocumentElement as GeckoHtmlElement;
+
+					queryIsPlaying = "#play-pause.playing";
+					queryArtist = "#track-artist a";
+					queryTrack = "#track-name a";
+					queryTrackUri = "#track-name a";
+					attrTrackUri = "href";
+					queryAddButton = "#track-add";
+				}
+				// New Player
+				if( frame.Id == "main" )
+				{
+					doc = frame.ContentDocument.DocumentElement as GeckoHtmlElement;
+
+					queryIsPlaying = "#play.playing";
+					queryArtist = "p.artist a";
+					queryTrack = "p.track a";
+					queryTrackUri = "p.track a";
+					attrTrackUri = "data-uri"; 
+					queryAddButton = ".caption button.button-add";
+				}
+
 				if( doc != null )
 				{
 					SpotifyState oldState = currentSpotifyState;
 					string oldTrack = currentTrack.TrackUri;
 
 					// get current track
-					var isPlaying = doc.QuerySelector( "#play.playing" );
+					var isPlaying = doc.QuerySelector( queryIsPlaying );
 					if( isPlaying != null )
 					{
 						currentSpotifyState = SpotifyState.Playing;
-						var artist = doc.QuerySelector( "p.artist a" ).TextContent;
-						var title = doc.QuerySelector( "p.track a" ).TextContent;
-						var trackUri = doc.QuerySelector( "p.track a" ).GetAttribute( "data-uri" );
-						currentTrack = new Mp3Tag( title, artist, trackUri);
+						var artist = doc.QuerySelector( queryArtist ).TextContent;
+						var title = doc.QuerySelector( queryTrack ).TextContent;
+						var trackUri = doc.QuerySelector( queryTrackUri ).GetAttribute( attrTrackUri );
+						currentTrack = new Mp3Tag( title, artist, trackUri );
 					}
 					else
+					{
 						currentSpotifyState = SpotifyState.Paused;
+					}
 
-					// ad detection
-					var addToMyMusicButton = doc.QuerySelector( ".caption button.button-add" );
+					// ad detection (new player only)
+					var addToMyMusicButton = doc.QuerySelector( queryAddButton );
 					if( addToMyMusicButton != null )
 					{
 						var style = addToMyMusicButton.Attributes["style"];
@@ -637,14 +668,17 @@ namespace SpotifyWebRecorder.Forms.UI
 							}
 						}
 					}
+					
+					// extra ad detection, works for old player too
+					if( currentTrack.Artist == "Spotify" ) currentSpotifyState = SpotifyState.Ad;
+
 
 					// mute sound on ads
 					if( currentSpotifyState == SpotifyState.Ad )
 					{
-						addToLog( "Ads detected - Attempting to Mute!" );
 						if( MuteOnAdsCheckBox.Checked && !MutedSound )
 						{
-							addToLog( "Muting..." );
+							addToLog( "Ads detected - Attempting to Mute!" );
 							Util.ToggleMuteVolume( this.Handle );
 							MutedSound = true;
 						}
@@ -660,37 +694,47 @@ namespace SpotifyWebRecorder.Forms.UI
 					}
 
 					// set state if changed
-					if( oldState != currentSpotifyState || oldTrack != currentTrack.TrackUri ) 
+					if( oldState != currentSpotifyState || oldTrack != currentTrack.TrackUri )
 					{
 						if( currentSpotifyState == SpotifyState.Playing )
 						{
 							var song = currentTrack.Artist + " - " + currentTrack.Title;
 							songLabel.Text = song;
-							addToLog( "Now playing: " + song );
-							if( _currentApplicationState != ApplicationState.NotRecording )
+							addToLog( "Now playing: " + song + " (" + currentTrack.TrackUri  + ")" );
+							if( _currentApplicationState != RecorderState.NotRecording && oldTrack != currentTrack.TrackUri )
 							{
-								ChangeApplicationState( ApplicationState.Recording );
+								ChangeApplicationState( RecorderState.Recording );
 							}
-							else if( _currentApplicationState == ApplicationState.Recording )
+							else if( _currentApplicationState == RecorderState.Recording )
 							{
-								ChangeApplicationState( ApplicationState.WaitingForRecording );
+								ChangeApplicationState( RecorderState.WaitingForRecording );
 							}
 						}
 						else if( currentSpotifyState == SpotifyState.Paused )
 						{
 							addToLog( "Music stopped" );
-							if( _currentApplicationState == ApplicationState.Recording )
+							if( _currentApplicationState == RecorderState.Recording )
 							{
-								ChangeApplicationState( ApplicationState.WaitingForRecording );
+								ChangeApplicationState( RecorderState.WaitingForRecording );
+							}
+						}
+						else if( currentSpotifyState == SpotifyState.Ad )
+						{
+							addToLog( "Ads..." );
+							if( _currentApplicationState == RecorderState.Recording )
+							{
+								ChangeApplicationState( RecorderState.WaitingForRecording );
 							}
 						}
 
 					}
 
+					break;
 				}
+
 			}
 
-			songLabel.Visible = _currentApplicationState == ApplicationState.Recording;
+			songLabel.Visible = _currentApplicationState == RecorderState.Recording;
 		}
 
 	}
